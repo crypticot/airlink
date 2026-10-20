@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirLink | Direct File Transfer</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        /* ======================================================================
+           1. VARIABLES AND BASE
+           ====================================================================== */
+        :root {
+            --bg: #090b12;
+            --surface: #11151f;
+            --raised: #1a2030;
+            --line: rgba(255, 255, 255, 0.08);
+            --line-strong: rgba(129, 140, 248, 0.55);
+
+            --accent: #7c83ff;
+            --accent-deep: #5b61f0;
+            --accent-soft: rgba(124, 131, 255, 0.16);
+            --ok: #34d399;
+            --ok-soft: rgba(52, 211, 153, 0.14);
+            --bad: #f87171;
+
+            --text: #f1f5f9;
+            --muted: #98a2b8;
+            --dim: #667085;
+
+            --r-sm: 10px;
+            --r-md: 16px;
+            --r-lg: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem 1rem;
+            background-image:
+                radial-gradient(ellipse 70% 45% at 50% -5%, rgba(124, 131, 255, 0.22), transparent 70%),
+                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+            background-size: auto, 44px 44px, 44px 44px;
+            background-attachment: fixed;
+        }
+
+        a:focus-visible,
+        button:focus-visible,
+        textarea:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* ======================================================================
+           2. APP SHELL
+           ====================================================================== */
+        .app {
+            width: 100%;
+            max-width: 480px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
+            box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7), 0 0 80px -30px rgba(124, 131, 255, 0.35);
+            overflow: hidden;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.1rem 1.4rem;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            font-size: 1.1rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: linear-gradient(140deg, var(--accent), #a78bfa);
+            display: grid;
+            place-items: center;
+            box-shadow: 0 6px 18px rgba(124, 131, 255, 0.4);
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.35rem 0.8rem;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--muted);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status i {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--dim);
+        }
+
+        .status.on {
+            color: var(--ok);
+            background: var(--ok-soft);
+            border-color: rgba(52, 211, 153, 0.3);
+        }
+
+        .status.on i {
+            background: var(--ok);
+            box-shadow: 0 0 10px var(--ok);
+        }
+
+        main {
+            padding: 1.4rem;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: enter 0.3s ease both;
+        }
+
+        @keyframes enter {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .screen.active { animation: none; }
+        }
+
+        /* ======================================================================
+           3. HOME
+           ====================================================================== */
+        .hero h1 {
+            font-size: 1.9rem;
+            line-height: 1.15;
+            font-weight: 800;
+            letter-spacing: -0.035em;
+            margin-bottom: 0.6rem;
+        }
+
+        .hero p {
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.55;
+            max-width: 38ch;
+        }
+
+        .choices {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.9rem;
+            margin-top: 1.5rem;
+        }
+
+        .choice {
+            background: var(--raised);
+            border: 1px solid var(--line);
+            border-radius: var(--r-md);
+            padding: 1.3rem 1rem;
+            text-align: left;
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .choice:hover {
+            border-color: var(--line-strong);
+            background: #1e2540;
+        }
+
+        .choice-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            display: grid;
+            place-items: center;
+            margin-bottom: 0.9rem;
+        }
+
+        .choice b {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .choice span {
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.4;
+        }
+
+        /* ======================================================================
+           4. PAIRING STEPS
+           ====================================================================== */
+        .step {
+            display: flex;
+            gap: 0.8rem;
+            margin-bottom: 1.4rem;
+        }
+
+        .step-num {
+            flex: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 0.78rem;
+            font-weight: 700;
+            display: grid;
+            place-items: center;
+        }
+
+        .step-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .step-body h2 {
+            font-size: 0.98rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .step-body p {
+            color: var(--muted);
+            font-size: 0.8rem;
+            line-height: 1.5;
+            margin-bottom: 0.7rem;
+        }
+
+        .code-box {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--line);
+            border-radius: var(--r-sm);
+            padding: 0.7rem;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            line-height: 1.5;
+            resize: none;
+        }
+
+        .qr {
+            display: none;
+            width: max-content;
+            max-width: 100%;
+            background: #fff;
+            padding: 0.7rem;
+            border-radius: var(--r-md);
+            margin-bottom: 0.7rem;
+        }
+
+        .qr.has-code {
+            display: block;
+        }
+
+        .qr canvas,
+        .qr img {
+            max-width: 100%;
+            height: auto !important;
+        }
+
+        /* ======================================================================
+           5. BUTTONS
+           ====================================================================== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            margin-top: 0.6rem;
+            padding: 0.8rem 1rem;
+            border: 1px solid transparent;
+            border-radius: var(--r-sm);
+            font: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--accent-deep);
+            color: #fff;
+        }
+
+        .btn-primary:hover { background: #4a50dc; }
+
+        .btn-ghost {
+            background: var(--raised);
+            border-color: var(--line);
+            color: var(--text);
+        }
+
+        .btn-ghost:hover { border-color: rgba(255, 255, 255, 0.2); }
+
+        .btn-danger {
+            background: rgba(248, 113, 113, 0.1);
+            border-color: rgba(248, 113, 113, 0.25);
+            color: var(--bad);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-small {
+            width: auto;
+            margin: 0;
+            padding: 0.4rem 0.85rem;
+            font-size: 0.78rem;
+        }
+
+        .back {
+            background: none;
+            border: 0;
+            color: var(--muted);
+            font: inherit;
+            font-size: 0.82rem;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        .back:hover { color: var(--text); }
+
+        /* ======================================================================
+           6. TRANSFER
+           ====================================================================== */
+        .drop {
+            border: 2px dashed rgba(255, 255, 255, 0.14);
+            border-radius: var(--r-md);
+            padding: 1.8rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .drop:hover,
+        .drop.over {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        .drop b {
+            display: block;
+            font-size: 0.92rem;
+            margin: 0.5rem 0 0.2rem;
+        }
+
+        .drop span {
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 1.6rem 0.5rem;
+            color: var(--muted);
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .files {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            margin: 1rem 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .file {
+            background: var(--raised);
+            border: 1px solid var(--line);
+            border-radius: var(--r-sm);
+            padding: 0.8rem;
+        }
+
+        .file-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+        }
+
+        .file-name {
+            font-size: 0.86rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-meta {
+            color: var(--muted);
+            font-size: 0.73rem;
+            margin-top: 0.15rem;
+        }
+
+        .bar {
+            height: 5px;
+            margin-top: 0.6rem;
+            background: var(--bg);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .bar i {
+            display: block;
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, var(--accent-deep), #a78bfa);
+            transition: width 0.1s linear;
+        }
+
+        .file.done .bar i { background: var(--ok); }
+        .file.failed .bar i { background: var(--bad); }
+
+        /* ======================================================================
+           7. FOOTER AND TOAST
+           ====================================================================== */
+        footer {
+            padding: 0.9rem 1.4rem;
+            border-top: 1px solid var(--line);
+            text-align: center;
+            color: var(--dim);
+            font-size: 0.75rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        footer a:hover { text-decoration: underline; }
+
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translate(-50%, 20px);
+            background: var(--raised);
+            border: 1px solid var(--line-strong);
+            padding: 0.65rem 1.1rem;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            max-width: 90vw;
+            text-align: center;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app">
+
+        <header>
+            <div class="brand">
+                <div class="brand-mark">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h8a4 4 0 0 1 0 8h-2"/><path d="M16 17H8a4 4 0 0 1 0-8h2"/></svg>
+                </div>
+                AirLink
+            </div>
+            <div class="status" id="status"><i></i><span id="statusText">Not connected</span></div>
+        </header>
+
+        <main>
+
+            <!-- HOME -->
+            <section class="screen active" id="screenHome">
+                <div class="hero">
+                    <h1>Send files from phone to PC, directly.</h1>
+                    <p>Files travel straight between your two devices. Nothing is uploaded to a server, and there is no size cap.</p>
+                </div>
+                <div class="choices">
+                    <button class="choice" onclick="startSend()">
+                        <div class="choice-icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                        </div>
+                        <b>Send</b>
+                        <span>Start here to share files</span>
+                    </button>
+                    <button class="choice" onclick="startReceive()">
+                        <div class="choice-icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                        </div>
+                        <b>Receive</b>
+                        <span>Join a sender with their code</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- SENDER PAIRING -->
+            <section class="screen" id="screenSend">
+                <button class="back" onclick="resetAll()">&larr; Back</button>
+
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-body">
+                        <h2>Share your offer code</h2>
+                        <p>On the receiving device, open AirLink, tap Receive, and paste this code.</p>
+                        <div class="qr" id="offerQR"></div>
+                        <textarea class="code-box" id="offerCode" rows="3" readonly placeholder="Preparing your code..."></textarea>
+                        <button class="btn btn-ghost" onclick="copyCode('offerCode')">Copy offer code</button>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-body">
+                        <h2>Paste the answer code</h2>
+                        <p>The receiver will show a reply code. Paste it here to connect.</p>
+                        <textarea class="code-box" id="answerInput" rows="3" placeholder="Paste answer code here"></textarea>
+                        <button class="btn btn-primary" onclick="acceptAnswer()">Connect</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RECEIVER PAIRING -->
+            <section class="screen" id="screenReceive">
+                <button class="back" onclick="resetAll()">&larr; Back</button>
+
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-body">
+                        <h2>Paste the offer code</h2>
+                        <p>Open AirLink on the sending device, tap Send, and copy the code it shows.</p>
+                        <textarea class="code-box" id="offerInput" rows="3" placeholder="Paste offer code here"></textarea>
+                        <button class="btn btn-primary" onclick="makeAnswer()">Create reply code</button>
+                    </div>
+                </div>
+
+                <div class="step" id="answerStep" style="display: none;">
+                    <div class="step-num">2</div>
+                    <div class="step-body">
+                        <h2>Send the reply code back</h2>
+                        <p>Copy this code into the sender's second box. The link opens as soon as they connect.</p>
+                        <div class="qr" id="answerQR"></div>
+                        <textarea class="code-box" id="answerCode" rows="3" readonly></textarea>
+                        <button class="btn btn-ghost" onclick="copyCode('answerCode')">Copy reply code</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TRANSFER -->
+            <section class="screen" id="screenTransfer">
+                <div id="pickerArea">
+                    <div class="drop" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <b>Choose files or drop them here</b>
+                        <span>Any type, as many as you like</span>
+                    </div>
+                    <input type="file" id="fileInput" multiple hidden>
+                </div>
+
+                <div class="empty" id="receiveHint" style="display: none;">Connected. Files the sender picks will appear here, ready to download.</div>
+
+                <div class="files" id="fileList"></div>
+
+                <button class="btn btn-danger" onclick="resetAll()">Disconnect</button>
+            </section>
+
+        </main>
+
+        <footer>
+            AirLink &bull; Encrypted peer-to-peer transfer &bull; Built by <a href="https://github.com/crypticot" target="_blank" rel="noopener">Dubem</a>
+        </footer>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- ======================================================================
+         8. LOGIC
+         ====================================================================== -->
+    <script>
+        /* ---------- Constants and state ---------- */
+        const BLOCK_SIZE = 256 * 1024;      // bytes read from disk at once
+        const CHUNK_SIZE = 16 * 1024;       // bytes per data channel message
+        const BUFFER_HIGH = 1024 * 1024;    // pause sending above this
+        const BUFFER_LOW = 256 * 1024;      // resume sending below this
+        const ICE_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        let pc = null;
+        let channel = null;
+        let role = null;
+        let sendChain = Promise.resolve();
+        let incoming = null;
+        let lastPaint = 0;
+        const rows = {};
+
+        const $ = (id) => document.getElementById(id);
+
+        /* ---------- Small helpers ---------- */
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+            $(id).classList.add('active');
+        }
+
+        function setStatus(text, on) {
+            $('statusText').textContent = text;
+            $('status').classList.toggle('on', !!on);
+        }
+
+        function toast(message) {
+            const el = $('toast');
+            el.textContent = message;
+            el.classList.add('show');
+            clearTimeout(toast.timer);
+            toast.timer = setTimeout(() => el.classList.remove('show'), 2600);
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+            return (bytes / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + units[i];
+        }
+
+        function copyCode(id) {
+            const box = $(id);
+            if (!box.value) return toast('Nothing to copy yet');
+            box.select();
+            navigator.clipboard.writeText(box.value)
+                .then(() => toast('Code copied'))
+                .catch(() => toast('Press and hold to copy the code'));
+        }
+
+        function drawQR(id, text) {
+            const holder = $(id);
+            holder.innerHTML = '';
+            holder.classList.remove('has-code');
+            try {
+                new QRCode(holder, {
+                    text: text,
+                    width: 220,
+                    height: 220,
+                    correctLevel: QRCode.CorrectLevel.L
+                });
+                holder.classList.add('has-code');
+            } catch (err) {
+                /* Code too long for a QR. Copy and paste still works. */
+            }
+        }
+
+        /* ---------- Code encoding (compressed SDP) ---------- */
+        function bytesToB64(bytes) {
+            let bin = '';
+            bytes.forEach((b) => { bin += String.fromCharCode(b); });
+            return btoa(bin);
+        }
+
+        function b64ToBytes(b64) {
+            const bin = atob(b64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes;
+        }
+
+        async function encodeCode(text) {
+            if (!window.CompressionStream) return 'r' + btoa(text);
+            const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+            const packed = new Uint8Array(await new Response(stream).arrayBuffer());
+            return 'z' + bytesToB64(packed);
+        }
+
+        async function decodeCode(code) {
+            const mode = code.charAt(0);
+            const body = code.slice(1);
+            if (mode === 'r') return atob(body);
+            if (mode !== 'z') throw new Error('Unknown code');
+            const stream = new Blob([b64ToBytes(body)]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+            return await new Response(stream).text();
+        }
+
+        /* ---------- WebRTC setup ---------- */
+        function createConnection() {
+            pc = new RTCPeerConnection(ICE_CONFIG);
+
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'failed') {
+                    setStatus('Connection failed', false);
+                    toast('Could not link the devices. Try the same Wi-Fi network.');
+                } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+                    setStatus('Not connected', false);
+                }
+            };
+        }
+
+        function waitForIce() {
+            return new Promise((resolve) => {
+                if (pc.iceGatheringState === 'complete') return resolve();
+                const timer = setTimeout(resolve, 4000);
+                pc.addEventListener('icegatheringstatechange', () => {
+                    if (pc.iceGatheringState === 'complete') {
+                        clearTimeout(timer);
+                        resolve();
+                    }
+                });
+            });
+        }
+
+        function bindChannel(ch) {
+            channel = ch;
+            channel.binaryType = 'arraybuffer';
+            channel.bufferedAmountLowThreshold = BUFFER_LOW;
+
+            channel.onopen = () => {
+                setStatus('Connected', true);
+                $('pickerArea').style.display = role === 'send' ? 'block' : 'none';
+                $('receiveHint').style.display = role === 'receive' ? 'block' : 'none';
+                showScreen('screenTransfer');
+            };
+
+            channel.onclose = () => setStatus('Not connected', false);
+            channel.onmessage = (event) => handleIncoming(event.data);
+        }
+
+        /* ---------- Sender pairing ---------- */
+        async function startSend() {
+            role = 'send';
+            showScreen('screenSend');
+            setStatus('Waiting for receiver', false);
+
+            createConnection();
+            bindChannel(pc.createDataChannel('files'));
+
+            await pc.setLocalDescription(await pc.createOffer());
+            await waitForIce();
+
+            const code = await encodeCode(pc.localDescription.sdp);
+            $('offerCode').value = code;
+            drawQR('offerQR', code);
+        }
+
+        async function acceptAnswer() {
+            const raw = $('answerInput').value.trim();
+            if (!raw) return toast('Paste the answer code first');
+            try {
+                const sdp = await decodeCode(raw);
+                await pc.setRemoteDescription({ type: 'answer', sdp: sdp });
+                setStatus('Connecting...', false);
+            } catch (err) {
+                toast('That answer code is not valid');
+            }
+        }
+
+        /* ---------- Receiver pairing ---------- */
+        function startReceive() {
+            role = 'receive';
+            showScreen('screenReceive');
+            setStatus('Waiting for sender', false);
+
+            createConnection();
+            pc.ondatachannel = (event) => bindChannel(event.channel);
+        }
+
+        async function makeAnswer() {
+            const raw = $('offerInput').value.trim();
+            if (!raw) return toast('Paste the offer code first');
+            try {
+                const sdp = await decodeCode(raw);
+                await pc.setRemoteDescription({ type: 'offer', sdp: sdp });
+                await pc.setLocalDescription(await pc.createAnswer());
+                await waitForIce();
+
+                const code = await encodeCode(pc.localDescription.sdp);
+                $('answerCode').value = code;
+                drawQR('answerQR', code);
+                $('answerStep').style.display = 'flex';
+            } catch (err) {
+                toast('That offer code is not valid');
+            }
+        }
+
+        /* ---------- Sending ---------- */
+        function queueFiles(fileList) {
+            Array.from(fileList).forEach((file) => {
+                const id = Math.random().toString(36).slice(2, 10);
+                addRow(id, file.name, file.size, 'Waiting');
+                sendChain = sendChain.then(() => sendFile(id, file));
+            });
+        }
+
+        function waitForDrain() {
+            return new Promise((resolve) => {
+                channel.onbufferedamountlow = () => {
+                    channel.onbufferedamountlow = null;
+                    resolve();
+                };
+            });
+        }
+
+        async function sendFile(id, file) {
+            try {
+                channel.send(JSON.stringify({
+                    type: 'meta',
+                    id: id,
+                    name: file.name,
+                    size: file.size,
+                    mime: file.type
+                }));
+
+                const started = Date.now();
+                let offset = 0;
+
+                while (offset < file.size) {
+                    if (channel.readyState !== 'open') throw new Error('closed');
+
+                    const block = await file.slice(offset, offset + BLOCK_SIZE).arrayBuffer();
+
+                    for (let pos = 0; pos < block.byteLength; pos += CHUNK_SIZE) {
+                        if (channel.bufferedAmount > BUFFER_HIGH) await waitForDrain();
+                        channel.send(block.slice(pos, pos + CHUNK_SIZE));
+                    }
+
+                    offset += block.byteLength;
+                    paintProgress(id, offset, file.size, started);
+                }
+
+                finishRow(id, 'Sent ' + formatBytes(file.size), true);
+            } catch (err) {
+                finishRow(id, 'Failed. The connection closed.', false);
+            }
+        }
+
+        /* ---------- Receiving ---------- */
+        function handleIncoming(data) {
+            if (typeof data === 'string') {
+                const msg = JSON.parse(data);
+                if (msg.type !== 'meta') return;
+
+                incoming = { meta: msg, chunks: [], got: 0, started: Date.now() };
+                addRow(msg.id, msg.name, msg.size, 'Receiving');
+                if (msg.size === 0) completeReceive();
+                return;
+            }
+
+            if (!incoming) return;
+            incoming.chunks.push(data);
+            incoming.got += data.byteLength;
+            paintProgress(incoming.meta.id, incoming.got, incoming.meta.size, incoming.started);
+
+            if (incoming.got >= incoming.meta.size) completeReceive();
+        }
+
+        function completeReceive() {
+            const meta = incoming.meta;
+            const blob = new Blob(incoming.chunks, { type: meta.mime || 'application/octet-stream' });
+            const link = document.createElement('a');
+
+            link.className = 'btn btn-primary btn-small';
+            link.textContent = 'Download';
+            link.href = URL.createObjectURL(blob);
+            link.download = meta.name;
+
+            finishRow(meta.id, formatBytes(meta.size) + ' received', true, link);
+            incoming = null;
+        }
+
+        /* ---------- File rows ---------- */
+        function addRow(id, name, size, label) {
+            const el = document.createElement('div');
+            el.className = 'file';
+
+            const top = document.createElement('div');
+            top.className = 'file-top';
+
+            const info = document.createElement('div');
+            info.style.minWidth = '0';
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'file-name';
+            nameEl.textContent = name;
+
+            const meta = document.createElement('div');
+            meta.className = 'file-meta';
+            meta.textContent = label + ' / ' + formatBytes(size);
+
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            bar.appendChild(document.createElement('i'));
+
+            info.append(nameEl, meta);
+            top.appendChild(info);
+            el.append(top, bar);
+            $('fileList').appendChild(el);
+
+            rows[id] = { el: el, top: top, meta: meta, fill: bar.firstChild };
+        }
+
+        function paintProgress(id, done, total, started) {
+            const row = rows[id];
+            const now = Date.now();
+            if (!row || (now - lastPaint < 90 && done < total)) return;
+            lastPaint = now;
+
+            const pct = total ? (done / total) * 100 : 100;
+            const speed = done / Math.max((now - started) / 1000, 0.001);
+            row.fill.style.width = pct.toFixed(1) + '%';
+            row.meta.textContent = pct.toFixed(0) + '% at ' + formatBytes(speed) + '/s';
+        }
+
+        function finishRow(id, text, ok, extra) {
+            const row = rows[id];
+            if (!row) return;
+            row.el.classList.add(ok ? 'done' : 'failed');
+            row.fill.style.width = '100%';
+            row.meta.textContent = text;
+            if (extra) row.top.appendChild(extra);
+        }
+
+        /* ---------- Reset ---------- */
+        function resetAll() {
+            if (channel) channel.close();
+            if (pc) pc.close();
+            pc = null;
+            channel = null;
+            role = null;
+            incoming = null;
+            sendChain = Promise.resolve();
+
+            ['offerCode', 'answerInput', 'offerInput', 'answerCode'].forEach((id) => { $(id).value = ''; });
+            ['offerQR', 'answerQR'].forEach((id) => {
+                $(id).innerHTML = '';
+                $(id).classList.remove('has-code');
+            });
+            $('answerStep').style.display = 'none';
+            $('fileList').innerHTML = '';
+            Object.keys(rows).forEach((key) => delete rows[key]);
+
+            setStatus('Not connected', false);
+            showScreen('screenHome');
+        }
+
+        /* ---------- File picker and drag and drop ---------- */
+        $('fileInput').addEventListener('change', (event) => {
+            queueFiles(event.target.files);
+            event.target.value = '';
+        });
+
+        const dropZone = $('dropZone');
+        ['dragenter', 'dragover'].forEach((name) => {
+            dropZone.addEventListener(name, (event) => {
+                event.preventDefault();
+                dropZone.classList.add('over');
+            });
+        });
+        ['dragleave', 'drop'].forEach((name) => {
+            dropZone.addEventListener(name, (event) => {
+                event.preventDefault();
+                dropZone.classList.remove('over');
+            });
+        });
+        dropZone.addEventListener('drop', (event) => queueFiles(event.dataTransfer.files));
+    </script>
+</body>
+</html>
